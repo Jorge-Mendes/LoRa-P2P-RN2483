@@ -2,22 +2,36 @@
 # -*- coding: utf-8 -*-
 
 # --------------------------------------------------------------------------
-# LoRaBase.py
+# LoRaMain.py
 # Send data between LoRa devices without Gateway
-# Python 3+
+# Description: Main script
+# Python version: Python 3+
 # RN2483 documentation: http://ww1.microchip.com/downloads/en/DeviceDoc/40001784F.pdf
-# Jorge Mendes, Raul Morais, Nuno Silva, 09/2018
+# Author: Jorge Mendes
+# Contributors: Raul Morais, Nuno Silva
+# Date: 09/2018
 # --------------------------------------------------------------------------
+
+DEBUG = True
 
 import serial
 from time import sleep
 import os
 
 # ---------------------------------------------------------- 
-# LoRaBase class
+# Log function
 # ---------------------------------------------------------- 
-class LoRaBase(object):
-    # Some baseclass for RX an TX objects
+def log(log_msg):
+    if DEBUG:
+        print(log_msg)
+
+# ---------------------------------------------------------- 
+# LoRaMain class
+# ---------------------------------------------------------- 
+class LoRaMain(object):
+    LoRaDebug = DEBUG
+
+    # Some configurations for the modules
     _cmd_no_mac = [
         'sys get ver',
         'sys get hweui',
@@ -46,8 +60,16 @@ class LoRaBase(object):
         cnt = 5
 
         while cnt:
-            s.send_break(duration=0.25)   # Send break, pull TX low
-            s.write(b'U')                 # Send 0x55 for autobaud
+            # pyserial >= 3.0
+            try:
+                s.send_break(duration=0.25)       # Send break, pull TX low
+            except:
+            # pyserial < 3.0 (deprecated)
+                try:
+                    s.sendBreak(duration=0.25)    # Send break, pull TX low
+                except:
+                    print('[ERROR] send_break/sendBreak error')		
+            s.write(b'U')                         # Send 0x55 for autobaud
             sleep(0.1)
             s.write(b'sys get ver\r\n')
             r = s.readline()
@@ -63,17 +85,25 @@ class LoRaBase(object):
         assert port is not None, "\t[ERROR] Port must be given, name of serial device"
 
         try:
-            self._ptx = serial.Serial(port=port, baudrate=57600, timeout=2.0, write_timeout=2.0)
+            # pyserial >= 3.0
+            try:
+                self._ptx = serial.Serial(port=port, baudrate=57600, timeout=2.0, write_timeout=2.0)
+            except:
+            # pyserial < 3.0 (deprecated)
+                try:
+                    self._ptx = serial.Serial(port=port, baudrate=57600, timeout=2.0, writeTimeout=2.0)
+                except:
+                    print('[ERROR] write_timeout/writeTimeout error')		
         except serial.SerialException as sex:
             raise IOError(sex)
 
-        m = self.connect_module(self._ptx)  # Connect and sync with module
+        m = self.connect_module(self._ptx)        # Connect and sync with module
         if m:
             os.system('clear')
             print('\nMODULE CONNECTION...')
             self._firmware = m
             print("\t<< {m}".format(m=m))
-            print('\t\t[INFO] Success')
+            log('\t\t[INFO] Success')
         else:
             raise IOError('\t[ERROR] Module not talking to me!')
 
@@ -83,7 +113,7 @@ class LoRaBase(object):
                 print('\t>> {m}'.format(m=m))
                 self._ptx.write(m.encode())
                 self._ptx.write(b'\r\n')
-                r = self._ptx.readline()
+                r = self._ptx.readline().decode()
                 if len(r):
                     print('\t<< {r}'.format(r=r[:-2]))
                 else:
